@@ -6,7 +6,14 @@
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+for the initial design i would create an owner class that would have owner name, address, phone number and a pet ( sub class)
+I would create a pet class who will have name of pet, breed, 
+will have an owner
+### Core user actions
 
+1. The owner can add and manage care tasks for their pet, including walks, feeding, grooming, and medication.
+2. The owner can specify their available time, task priorities, and preferences to guide scheduling.
+3. The owner can view a daily care plan and understand why the app selected and ordered those tasks.
 **b. Design changes**
 
 - Did your design change during implementation?

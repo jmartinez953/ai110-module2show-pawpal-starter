@@ -1,0 +1,42 @@
+classDiagram
+    class Owner {
+        name: str
+        available_minutes: int
+        preferences: dict
+        pets: list
+        add_pet(pet)
+        set_available_time(minutes)
+        update_preferences(preferences)
+    }
+
+    class Pet {
+        name: str
+        species: str
+        tasks: list
+        add_task(task)
+        remove_task(task)
+        has_been_fed_today() bool
+        has_been_walked_today() bool
+    }
+
+    class Task {
+        name: str
+        category: str
+        duration_minutes: int
+        priority: int
+        completed_at: datetime_or_None
+        mark_complete()
+        is_completed() bool
+    }
+
+    class Scheduler {
+        owner: Owner
+        daily_plan: list
+        generate_plan()
+        explain_plan() str
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" Task : has
+    Scheduler --> "1" Owner : plans for
+    Scheduler ..> Task : selects and orders
