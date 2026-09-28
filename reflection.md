@@ -4,20 +4,17 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
-for the initial design i would create an owner class that would have owner name, address, phone number and a pet ( sub class)
-I would create a pet class who will have name of pet, breed, 
-will have an owner
+My initial design includes four classes: Owner, Pet, Task, and Scheduler. Owner stores the owner's name, available time, preferences, and pets. Pet stores its name, species, and care tasks, and checks whether feeding or walking has been completed today. Task stores a care activity's name, category, duration, priority, and completion date and time. Scheduler uses the owner's information and pet tasks to create a daily plan and explain its choices. An Owner has Pets, and each Pet has Tasks. Scheduler works with these objects without inheriting from them.
 ### Core user actions
 
-1. The owner can add and manage care tasks for their pet, including walks, feeding, grooming, and medication.
+1. feeding, grooming, and medication.
 2. The owner can specify their available time, task priorities, and preferences to guide scheduling.
-3. The owner can view a daily care plan and understand why the app selected and ordered those tasks.
+3. The owner can view a daily care plan and understand why the app selected and ordered those tasks.The owner can add and manage care tasks for their pet, including walks, 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+During the AI review, I changed Scheduler's daily_plan from a list of Tasks to a list of (Pet, Task) pairs. A list of Tasks alone did not directly identify which pet each scheduled task belonged to. Keeping the pet and task together makes the plan clearer when multiple pets have similar care tasks, such as morning feeding.
 
 ---
 
