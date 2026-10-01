@@ -29,6 +29,8 @@ During the AI review, I changed Scheduler's daily_plan from a list of Tasks to a
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+I kept an explicit loop for filtering tasks instead of using a more compact list comprehension. I combined nested if statements and prepared the requested pet name once before the loop. This makes the method easier for me to read while avoiding repeated name formatting. The tradeoff is that the code takes more lines than a list comprehension, but I find it easier to explain and debug. Running the CLI demo confirmed that filtering by pet and completion status still produced the expected results.
+Some of these algorithms were already ai created so i decided to change the one that were harder to understand and i made sure the updated version were easier to explain
 
 ---
 

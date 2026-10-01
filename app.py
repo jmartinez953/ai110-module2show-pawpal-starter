@@ -1,4 +1,6 @@
-import streamlit as st
+import streamlit as st 
+from pawpal_system import Owner, Pet, Task, Scheduler
+
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -40,14 +42,51 @@ st.divider()
 
 st.subheader("Quick Demo Inputs (UI only)")
 owner_name = st.text_input("Owner name", value="Jordan")
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(
+        name=owner_name,
+        available_minutes=60,
+    )
+
+owner = st.session_state.owner
+owner.name = owner_name
 pet_name = st.text_input("Pet name", value="Mochi")
 species = st.selectbox("Species", ["dog", "cat", "other"])
+if st.button("Add pet"):
+    if pet_name.strip():
+        pet = Pet(name=pet_name.strip(), species=species)
+        owner.add_pet(pet)
+        st.success(f"Added pet: {pet.name}")
+    else:
+        st.warning("Please enter a valid pet name.")
+
+st.subheader("Your pets")
+
+if owner.pets:
+    for pet in owner.pets:
+        st.write(f"- {pet.name} ({pet.species})")
+else:
+    st.info("No pets yet. Add one above.")
+        
+
+
 
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+selected_pet_index = st.selectbox(
+    "Choose a pet for this task",
+    options=range(len(owner.pets)),
+    format_func=lambda index: (
+        f"{index + 1}. {owner.pets[index].name} "
+        f"({owner.pets[index].species})"
+    ),
+)
 
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
+
+category = st.selectbox(
+    "Task category",
+    ["walking", "feeding", "grooming", "medication", "other"],
+)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -58,13 +97,40 @@ with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
 if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
+    if selected_pet_index is None:
+        st.warning("Please add a pet first.")
+    elif not task_title.strip():
+        st.warning("Please enter a task title.")
+    else:
+        priority_values = {"high": 1, "medium": 2, "low": 3}
 
-if st.session_state.tasks:
+        task = Task(
+            name=task_title.strip(),
+            category=category,
+            duration_minutes=int(duration),
+            priority=priority_values[priority],
+        )
+
+        selected_pet = owner.pets[selected_pet_index]
+        selected_pet.add_task(task)
+        st.success(f"Added {task.name} for {selected_pet.name}!")
+
+all_tasks = owner.get_all_tasks()
+
+if all_tasks:
     st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+    task_rows = []
+
+    for pet, task in all_tasks:
+        task_rows.append({
+            "Pet": pet.name,
+            "Task": task.name,
+            "Category": task.category,
+            "Duration (minutes)": task.duration_minutes,
+            "Priority": task.priority,
+        })
+
+    st.table(task_rows)
 else:
     st.info("No tasks yet. Add one above.")
 

@@ -83,11 +83,14 @@ Sample test output:
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
 
+| Task sorting | `Scheduler.sort_by_time()` | Returns a new list of the daily plan's pet-task pairs, ordered by scheduled date and time. Tasks without a start time appear last. || Filtering | | e.g., skip tasks if time runs out |
+
+| Conflict handling | `Scheduler.detect_conflicts()` | Returns warnings for overlapping unfinished tasks across all pets, using start times and durations. Skips tasks without start times. Tasks that end exactly when another begins do not conflict. |
+
+| Recurring tasks | `Task.next_due_date()`, `Scheduler.mark_task_complete()` | Completing a daily or weekly task through Scheduler creates a new unfinished occurrence one or seven days after completion, preserving the scheduled clock time. Keeps the completed task for history. One-time tasks do not repeat. |
+
+| Filtering | `Scheduler.filter_tasks()` | Filters all pet-task pairs by optional pet name and completion status. Name matching ignores capitalization. Omitted filters include all names or both statuses. |
 ## 📸 Demo Walkthrough
 
 Describe your app in numbered steps so a reader can follow along without watching a video:

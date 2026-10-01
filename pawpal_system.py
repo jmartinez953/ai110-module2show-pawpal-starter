@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 
 @dataclass
@@ -10,7 +11,7 @@ class Task:
     priority: int
     frequency: str = "once"
     completed_at: datetime | None = None
-
+    scheduled_start: datetime | None = None
     def mark_complete(self) -> None:
         """Record the current date and time as the task's completion time."""
         self.completed_at = datetime.now()
@@ -18,7 +19,24 @@ class Task:
     def is_completed(self) -> bool:
         """Return whether the task has a recorded completion time."""
         return self.completed_at is not None 
+    
+    def next_due_date(self) -> datetime | None:
+        """Calculate the next due date for a completed recurring task."""
+        # Unfinished tasks and one-time tasks do not generate a next due date.
+        if self.completed_at is None or self.frequency == "once":
+            return None
+        # Convert the frequency into days and count forward from completion.
+        intervals = {"daily": 1, "weekly": 7}
+        days = intervals[self.frequency]
+        next_date = self.completed_at + timedelta(days=days)
+        # Keep the original scheduled clock time on the new date.
+        if self.scheduled_start is not None:
+            next_date = datetime.combine(
+                next_date.date(),
+                self.scheduled_start.time(),
+            )
 
+        return next_date
 
 @dataclass
 class Pet:
@@ -117,4 +135,111 @@ class Scheduler:
         for pet, task in self.daily_plan:
             lines.append(f"- {pet.name}: {task.name}")
         return "\n".join(lines) 
+    def sort_by_time(self) -> list[tuple[Pet, Task]]:
+        
+        """Return the daily plan sorted by start time, with unscheduled tasks last."""
+        # Return a new sorted list without changing the original daily plan.
+        # Each pair contains a Pet at position 0 and a Task at position 1.
+        # The key puts scheduled tasks first, then orders them by start time.
+        # Missing start times use datetime.max as a comparison placeholder.
+        return sorted(
+            self.daily_plan,
+            key=lambda pair: (
+                pair[1].scheduled_start is None,
+                pair[1].scheduled_start or datetime.max,
+            ),
+        )
+
+
+
+    def filter_tasks(
+        self,
+        pet_name: str | None = None,
+        completed: bool | None = None,
+    ) -> list[tuple[Pet, Task]]:
+        """Return tasks matching the optional pet name and completion status."""
+        matches = []
+        requested_name = pet_name.strip().casefold() if pet_name is not None else None
+
+                # Visit each pet and its task, one pair at a time.
+        for pet, task in self.owner.get_all_tasks():
+            # If a name was requested, skip pets whose names do not match.
+            if requested_name is not None and pet.name.casefold() != requested_name:
+                continue
+
+            # If a completion status was requested, skip tasks with a different status.
+            if completed is not None and task.is_completed() != completed:
+                continue
+
+            # This pair passed both checks, so include it in the results.
+            matches.append((pet, task))
+
+        # After checking every pair, return all the matches.
+        return matches
+
+
+
     
+    def mark_task_complete(self, pet: Pet, task: Task) -> None:
+        """Complete a pet's task and add its next occurrence when recurring."""
+        # Check that this exact Task object belongs to the selected pet.
+        if not any(existing is task for existing in pet.tasks):
+            raise ValueError("This task does not belong to the selected pet.")
+        # Stop if already completed so repeated calls cannot create duplicates.
+        if task.is_completed():
+            return
+
+        if task.frequency not in {"once", "daily", "weekly"}:
+            raise ValueError("Frequency must be once, daily, or weekly.")
+        # Keep the original task as a completed record and calculate its next date.
+        task.mark_complete()
+        next_start = task.next_due_date()
+
+        # Create a separate unfinished task for the next recurring occurrence.
+        if next_start is not None:
+            next_task = Task(
+                name=task.name,
+                category=task.category,
+                duration_minutes=task.duration_minutes,
+                priority=task.priority,
+                frequency=task.frequency,
+                scheduled_start=next_start,
+            )
+            pet.add_task(next_task)
+
+
+
+
+
+    def detect_conflicts(self) -> list[str]:
+        """Return warnings for overlapping unfinished tasks across all pets."""
+        # Build a list of pet-task pairs that need conflict checking.
+        # Include only unfinished tasks with a scheduled start time.
+        scheduled = [
+            (pet, task)
+            for pet, task in self.owner.get_all_tasks()
+            if task.scheduled_start is not None
+            and not task.is_completed()
+        ]
+        warnings = []
+        # Choose each scheduled task as the first task in a comparison.
+        for index, (pet_a, task_a) in enumerate(scheduled):
+            start_a = task_a.scheduled_start
+            end_a = start_a + timedelta(minutes=task_a.duration_minutes)
+
+            # Compare only with later entries to avoid self-comparisons and duplicate pairs.
+            for pet_b, task_b in scheduled[index + 1:]:
+                start_b = task_b.scheduled_start
+                end_b = start_b + timedelta(minutes=task_b.duration_minutes)
+
+                # Both tasks must start before the other ends to overlap.
+                # A task starting exactly when another ends is allowed.
+                if start_a < end_b and start_b < end_a:
+                    warnings.append(
+                        f"Conflict: {pet_a.name}'s {task_a.name} "
+                        f"({start_a:%Y-%m-%d %H:%M} to {end_a:%H:%M}) "
+                        f"overlaps with {pet_b.name}'s {task_b.name} "
+                        f"({start_b:%Y-%m-%d %H:%M} to {end_b:%H:%M})."
+                    )
+        # Return the collected messages; an empty list means no conflicts were found.
+        return warnings
