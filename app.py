@@ -1,4 +1,6 @@
 import streamlit as st 
+# Combine the date and time chosen by the owner into a task's start datetime.
+from datetime import datetime
 from pawpal_system import Owner, Pet, Task, Scheduler
 
 
@@ -8,39 +10,13 @@ st.title("🐾 PawPal+")
 
 st.markdown(
     """
-Welcome to the PawPal+ starter app.
-
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
-
-Use this app as your interactive demo once your backend classes/functions exist.
+Add pets and care tasks, filter your task list, and view scheduled tasks in time order with overlap warnings.
 """
 )
 
-with st.expander("Scenario", expanded=True):
-    st.markdown(
-        """
-**PawPal+** is a pet care planning assistant. It helps a pet owner plan care tasks
-for their pet(s) based on constraints like time, priority, and preferences.
-
-You will design and implement the scheduling logic and connect it to this Streamlit UI.
-"""
-    )
-
-with st.expander("What you need to build", expanded=True):
-    st.markdown(
-        """
-At minimum, your system should:
-- Represent pet care tasks (what needs to happen, how long it takes, priority)
-- Represent the pet and the owner (basic info and preferences)
-- Build a plan/schedule for a day that chooses and orders tasks based on constraints
-- Explain the plan (why each task was chosen and when it happens)
-"""
-    )
-
 st.divider()
 
-st.subheader("Quick Demo Inputs (UI only)")
+st.subheader("Owner and pets")
 owner_name = st.text_input("Owner name", value="Jordan")
 if "owner" not in st.session_state:
     st.session_state.owner = Owner(
@@ -52,6 +28,9 @@ owner = st.session_state.owner
 owner.name = owner_name
 pet_name = st.text_input("Pet name", value="Mochi")
 species = st.selectbox("Species", ["dog", "cat", "other"])
+
+
+
 if st.button("Add pet"):
     if pet_name.strip():
         pet = Pet(name=pet_name.strip(), species=species)
@@ -72,7 +51,7 @@ else:
 
 
 st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
+st.caption("Add care tasks with a date and start time.")
 selected_pet_index = st.selectbox(
     "Choose a pet for this task",
     options=range(len(owner.pets)),
@@ -96,6 +75,11 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
+# Let the owner choose when this task should begin.
+scheduled_date = st.date_input("Task date")
+scheduled_time = st.time_input("Task start time", value="08:00")
+
+
 if st.button("Add task"):
     if selected_pet_index is None:
         st.warning("Please add a pet first.")
@@ -109,13 +93,46 @@ if st.button("Add task"):
             category=category,
             duration_minutes=int(duration),
             priority=priority_values[priority],
+            # Combine the selected date and time into this task's scheduled start.
+            scheduled_start=datetime.combine(scheduled_date, scheduled_time),
         )
 
         selected_pet = owner.pets[selected_pet_index]
         selected_pet.add_task(task)
         st.success(f"Added {task.name} for {selected_pet.name}!")
 
-all_tasks = owner.get_all_tasks()
+
+# A blank name includes all pets; a name limits the report to matching pets.
+pet_name_filter = st.text_input(
+    "Filter by pet name",
+    help="Leave blank to show all pets. Names are matched without regard to capitalization.",
+)
+
+# Let the owner choose which completion statuses appear in the report.
+status_choice = st.selectbox(
+    "Show tasks",
+    ["All tasks", "Unfinished", "Completed"],
+)
+
+# Translate the displayed choice into the backend's optional Boolean filter.
+status_filters = {
+    "All tasks": None,
+    "Unfinished": False,
+    "Completed": True,
+}
+
+# Retrieve matching tasks and pass them to the existing table below.
+report_scheduler = Scheduler(owner)
+
+# Pass both filters to Scheduler; None means no pet-name restriction.
+all_tasks = report_scheduler.filter_tasks(
+    pet_name=pet_name_filter.strip() or None,
+    completed=status_filters[status_choice],
+)
+
+
+
+
 
 if all_tasks:
     st.write("Current tasks:")
@@ -125,6 +142,13 @@ if all_tasks:
         task_rows.append({
             "Pet": pet.name,
             "Task": task.name,
+            # Show the completion status used by the report filter.
+            "Status": "Completed" if task.is_completed() else "Unfinished",
+            # Show the date and time; older tasks may have no scheduled start.
+            "Scheduled start": (
+                task.scheduled_start.strftime("%Y-%m-%d %H:%M")
+                if task.scheduled_start is not None
+                else "Unscheduled"),
             "Category": task.category,
             "Duration (minutes)": task.duration_minutes,
             "Priority": task.priority,
@@ -132,23 +156,50 @@ if all_tasks:
 
     st.table(task_rows)
 else:
-    st.info("No tasks yet. Add one above.")
+    # An empty result may mean existing tasks did not match the filters.
+    st.info("No tasks match the selected filters.")
 
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+st.caption("Show unfinished tasks in scheduled date and time order.")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    # Collect the owner's unfinished tasks, then sort them by start time.
+    scheduler = Scheduler(owner)
+    scheduler.generate_plan()
+    sorted_tasks = scheduler.sort_by_time()
+
+    if sorted_tasks:
+        schedule_rows = []
+
+        # Turn each sorted pet-task pair into a readable table row.
+        for pet, task in sorted_tasks:
+            schedule_rows.append({
+                "Pet": pet.name,
+                "Task": task.name,
+                "Scheduled start": (
+                    task.scheduled_start.strftime("%Y-%m-%d %H:%M")
+                    if task.scheduled_start is not None
+                    else "Unscheduled"
+                ),
+                "Duration (minutes)": task.duration_minutes,
+                "Priority": task.priority,
+                "Status": "Completed" if task.is_completed() else "Unfinished", 
+            })
+
+        st.table(schedule_rows)
+
+        # Check unfinished tasks across all pets for overlapping times.
+        conflicts = scheduler.detect_conflicts()
+
+        if conflicts:
+            # Display each conflicting pair so the owner can identify it.
+            for message in conflicts:
+                st.warning(message)
+        else:
+            st.success("No time overlaps found among scheduled unfinished tasks.")
+
+
+    else:
+        st.info("No unfinished tasks to schedule.")
